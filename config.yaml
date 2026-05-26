@@ -1,0 +1,33 @@
+experimental: true
+app:
+  port: 8080
+  log_level: "debug"
+  is_prod: false
+  shutdown_timeout: 15s
+
+kafka:
+  brokers:
+    - "kafka:9092"
+  topic: "wb-search-queries"
+  group: "trends-processor"
+
+anti_fraud:
+  cache_size: 100000
+  limit: 100
+  ttl: "10s"
+
+collector:
+  bucket_duration: "5s"
+  window_duration: "5m"
+  ticker_duration: "1s"
+  top_limit: 1000
+
+stop_list:
+  words:
+   - скам
+   - накрутка отзывов вб
+   - вейп
+   - сигареты
+   - купить паспорт
+   - хакерский софт 
+   - курительные смеси

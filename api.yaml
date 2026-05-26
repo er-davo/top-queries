@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: Top Queries API
+  version: 1.0.0
+  description: API для отслеживания топ-запросов маркетплейса с антифродом
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер приложения (Go Backend)
+paths:
+  /api/v1/top:
+    get:
+      summary: Получить топ популярных поисковых запросов за последние 5 минут
+      operationId: getTopQueries
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Успешный ответ со списком трендов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopQueriesResponse'
+        '400':
+          description: Некорректные параметры запроса (например, неверный limit)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/stop-list:
+    post:
+      summary: Массово добавить слова в динамический стоп-лист
+      operationId: addStopWords
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StopWordsRequest'
+      responses:
+        '201':
+          description: Слова успешно добавлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Некорректный JSON или сломанная структура тела запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка бизнес-валидации списка слов (например, переданы пустые строки)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Массово удалить слова из динамического стоп-листа
+      operationId: deleteStopWords
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StopWordsRequest'
+      responses:
+        '200':
+          description: Слова успешно удалены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Некорректный JSON или сломанная структура тела запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Слова не найдены в текущем стоп-листе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    TopQueriesResponse:
+      type: object
+      required:
+        - data
+        - updated_at
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopQueryItem'
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-24T20:30:00Z"
+          description: Время последнего перерасчета топа воркером
+
+    TopQueryItem:
+      type: object
+      required:
+        - query
+        - count
+      properties:
+        query:
+          type: string
+          example: "iphone 15 pro"
+        count:
+          type: integer
+          format: int64
+          example: 1450
+
+    StopWordsRequest:
+      type: object
+      required:
+        - words
+      properties:
+        words:
+          type: array
+          items:
+            type: string
+          example: ["скам", "накрутка", "запрещено"]
+
+    StatusResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+    
+    ErrorCode:
+      type: string
+      enum:
+        - INVALID_ARGUMENT     # Неверные параметры в query (например, limit)
+        - BAD_REQUEST          # Сломленный JSON или пустое тело
+        - VALIDATION_FAILED    # Ошибка бизнес-валидации (пустая строка стоп-слова)
+        - WORDS_NOT_FOUND      # Попытка удалить слова, которых нет в стоп-листе
+        - INTERNAL_ERROR       # Ошибки сервера (проблемы с автоматом, памятью и т.д.)
+      example: "INVALID_ARGUMENT"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - code
+      properties:
+        error:
+          type: string
+          example: "Некорректное значение параметра limit"
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        details:
+          type: string
+          example: "Параметр limit должен быть в диапазоне от 1 до 100"

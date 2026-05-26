@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  top-queries-app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: top-queries-app
+    ports:
+      - "8080:8080"
+    environment:
+      - CONFIG_PATH=/app/config/config.yaml
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  kafka:
+    image: bitnamilegacy/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  kafka-init:
+    image: bitnamilegacy/kafka:latest
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./scripts/kafka-init.sh:/kafka-init.sh
+    entrypoint: ["/bin/sh", "/kafka-init.sh"]
+  
+  traffic-generator:
+    build:
+      context: .
+      dockerfile: generator.dockerfile
+    container_name: traffic-generator
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    command: -broker=kafka:9092 -topic=wb-search-queries -rps=2000
+    restart: unless-stopped
+  
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: swagger-ui
+    ports:
+      - "8081:8080"
+    environment:
+      - SWAGGER_JSON=/openapi/api.yaml
+    volumes:
+      - ./api.yaml:/openapi/api.yaml:ro
